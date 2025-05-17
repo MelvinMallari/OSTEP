@@ -19,12 +19,6 @@
  *    reduce overhead but can delay short jobs behind longer ones.
  */
 
-// Time slices per priority level
-// Short quanta for high-priority (interactive) tasks keep latency low.
-// Longer quanta at lower levels reduce context-switch overhead for long-running jobs.
-const timeQuantums: number[] = [5, 10, 20];
-const maxLevel: number = timeQuantums.length - 1;
-
 // Define jobs with: id, arrivalTime, burstTime
 interface Job {
   id: string;
@@ -68,41 +62,42 @@ function runMLFQ(timeQuantums: number[]): JobStats[] {
   const queues: TrackedJob[][] = timeQuantums.map(() => []); // One queue per level
   const executionTimeline: string[] = [];
 
-  // Main simulation loop
-  while (jobsFinished < jobs.length) {
-    // Enqueue newly arrived jobs to the highest-priority queue
-    jobs.forEach((job: TrackedJob) => {
+  // Helper function to enqueue newly arrived jobs
+  const enqueueNewJobs = () => {
+    jobs.forEach((job) => {
       if (!job.enqueued && job.arrivalTime <= currentTime) {
         queues[0].push(job);
         job.enqueued = true;
       }
     });
+  };
 
-    // Find the highest‐priority nonempty queue
-    let jobToRun: TrackedJob | undefined = undefined;
-    let queueLevel: number = 0;
+  // Main simulation loop
+  while (jobsFinished < jobs.length) {
+    // Enqueue newly arrived jobs to the highest-priority queue
+    enqueueNewJobs();
 
-    for (; queueLevel <= maxLevel; queueLevel++) {
-      if (queues[queueLevel].length > 0) {
-        jobToRun = queues[queueLevel].shift();
-        break;
-      }
-    }
+    // Find the highest‐priority nonempty queue and job to run
+    const queueIndex = queues.findIndex((queue) => queue.length > 0);
 
     // If no job is ready, CPU is idle
-    if (!jobToRun) {
+    if (queueIndex === -1) {
       executionTimeline.push(`${currentTime}-${currentTime + 1}: IDLE`);
       currentTime++;
       continue;
     }
 
+    const jobToRun = queues[queueIndex].shift()!;
+
     // Job runs for remaining time or for entire quantum
-    const quantum: number = timeQuantums[queueLevel];
+    const quantum: number = timeQuantums[queueIndex];
     const runTime: number = Math.min(quantum, jobToRun.remainingTime);
 
-    const timeRange: string = `${currentTime}-${currentTime + runTime}`;
-    const jobInfo: string = `${jobToRun.id} (Level ${queueLevel})`;
-    executionTimeline.push(`${timeRange}: ${jobInfo}`);
+    executionTimeline.push(
+      `${currentTime}-${currentTime + runTime}: ${
+        jobToRun.id
+      } (Level ${queueIndex})`
+    );
 
     // Update job's remaining time and current time
     jobToRun.remainingTime -= runTime;
@@ -122,38 +117,20 @@ function runMLFQ(timeQuantums: number[]): JobStats[] {
   console.log("--- CPU Timeline ---");
   console.log(executionTimeline.join("\n"));
 
-  // Calculate and print job statistics
+  // Calculate job statistics and print results
   console.log("\n--- Job Stats ---");
-  const jobStats: JobStats[] = inputJobs.map((originalJob: Job) => {
-    const trackedJob = jobs.find((j: TrackedJob) => j.id === originalJob.id);
-    if (!trackedJob || trackedJob.completionTime === null) {
-      // Handle the case where the job or completion time is not found,
-      // though in this algorithm, it should always be found.
-      // This satisfies TypeScript's null checks.
-      console.error(`Error: Job ${originalJob.id} not processed correctly.`);
-      return {
-        id: originalJob.id,
-        turnaroundTime: -1, // Or some other indicator of an error
-        waitingTime: -1, // Or some other indicator of an error
-      };
-    }
-    const turnaroundTime: number =
-      trackedJob.completionTime - trackedJob.arrivalTime;
-    const waitingTime: number = turnaroundTime - trackedJob.burstTime;
+  return inputJobs.map((originalJob: Job) => {
+    const trackedJob = jobs.find((j: TrackedJob) => j.id === originalJob.id)!;
+    const turnaroundTime = trackedJob.completionTime! - trackedJob.arrivalTime;
+    const waitingTime = turnaroundTime - trackedJob.burstTime;
 
     console.log(
       `${trackedJob.id} | Turnaround Time: ${turnaroundTime}, Waiting Time: ${waitingTime}`
     );
-    return {
-      id: trackedJob.id,
-      turnaroundTime,
-      waitingTime,
-    };
-  });
-  return jobStats;
-}
 
-const defaultQuantums: number[] = [5, 10, 20];
+    return { id: trackedJob.id, turnaroundTime, waitingTime };
+  });
+}
 
 const quantumTests: number[][] = [
   [5, 10, 20],
