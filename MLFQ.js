@@ -23,19 +23,15 @@ function runMLFQ(timeQuantums) {
     var jobsFinished = 0;
     var queues = timeQuantums.map(function () { return []; }); // One queue per level
     var executionTimeline = [];
-    // Helper function to enqueue newly arrived jobs
-    var enqueueNewJobs = function () {
+    // Main simulation loop
+    while (jobsFinished < jobs.length) {
+        // Enqueue newly arrived jobs to the highest-priority queue
         jobs.forEach(function (job) {
             if (!job.enqueued && job.arrivalTime <= currentTime) {
                 queues[0].push(job);
                 job.enqueued = true;
             }
         });
-    };
-    // Main simulation loop
-    while (jobsFinished < jobs.length) {
-        // Enqueue newly arrived jobs to the highest-priority queue
-        enqueueNewJobs();
         // Find the highest‐priority nonempty queue and job to run
         var queueIndex = queues.findIndex(function (queue) { return queue.length > 0; });
         // If no job is ready, CPU is idle
@@ -48,6 +44,7 @@ function runMLFQ(timeQuantums) {
         // Job runs for remaining time or for entire quantum
         var quantum = timeQuantums[queueIndex];
         var runTime = Math.min(quantum, jobToRun.remainingTime);
+        // Add job to execution timeline
         executionTimeline.push("".concat(currentTime, "-").concat(currentTime + runTime, ": ").concat(jobToRun.id, " (Level ").concat(queueIndex, ")"));
         // Update job's remaining time and current time
         jobToRun.remainingTime -= runTime;
@@ -75,6 +72,7 @@ function runMLFQ(timeQuantums) {
         return { id: trackedJob.id, turnaroundTime: turnaroundTime, waitingTime: waitingTime };
     });
 }
+// Test cases
 var quantumTests = [
     [5, 10, 20],
     [2, 4, 8],
@@ -83,6 +81,6 @@ var quantumTests = [
     [10, 20, 40],
 ];
 quantumTests.forEach(function (quantums, idx) {
-    console.log("\n===== Test ".concat(idx + 1, ": Quantums = [").concat(quantums.join(", "), "] ====="));
+    console.log("=== Test ".concat(idx + 1, ": Quantums = [").concat(quantums, "] ==="));
     runMLFQ(quantums);
 });

@@ -19,7 +19,6 @@
  *    reduce overhead but can delay short jobs behind longer ones.
  */
 
-// Define jobs with: id, arrivalTime, burstTime
 interface Job {
   id: string;
   arrivalTime: number;
@@ -62,20 +61,15 @@ function runMLFQ(timeQuantums: number[]): JobStats[] {
   const queues: TrackedJob[][] = timeQuantums.map(() => []); // One queue per level
   const executionTimeline: string[] = [];
 
-  // Helper function to enqueue newly arrived jobs
-  const enqueueNewJobs = () => {
+  // Main simulation loop
+  while (jobsFinished < jobs.length) {
+    // Enqueue newly arrived jobs to the highest-priority queue
     jobs.forEach((job) => {
       if (!job.enqueued && job.arrivalTime <= currentTime) {
         queues[0].push(job);
         job.enqueued = true;
       }
     });
-  };
-
-  // Main simulation loop
-  while (jobsFinished < jobs.length) {
-    // Enqueue newly arrived jobs to the highest-priority queue
-    enqueueNewJobs();
 
     // Find the highest‐priority nonempty queue and job to run
     const queueIndex = queues.findIndex((queue) => queue.length > 0);
@@ -93,6 +87,7 @@ function runMLFQ(timeQuantums: number[]): JobStats[] {
     const quantum: number = timeQuantums[queueIndex];
     const runTime: number = Math.min(quantum, jobToRun.remainingTime);
 
+    // Add job to execution timeline
     executionTimeline.push(
       `${currentTime}-${currentTime + runTime}: ${
         jobToRun.id
@@ -132,6 +127,7 @@ function runMLFQ(timeQuantums: number[]): JobStats[] {
   });
 }
 
+// Test cases
 const quantumTests: number[][] = [
   [5, 10, 20],
   [2, 4, 8],
@@ -140,9 +136,8 @@ const quantumTests: number[][] = [
   [10, 20, 40],
 ];
 
+// Run tests
 quantumTests.forEach((quantums, idx) => {
-  console.log(
-    `\n===== Test ${idx + 1}: Quantums = [${quantums.join(", ")}] =====`
-  );
+  console.log(`=== Test ${idx + 1}: Quantums = [${quantums}] ===`);
   runMLFQ(quantums);
 });
